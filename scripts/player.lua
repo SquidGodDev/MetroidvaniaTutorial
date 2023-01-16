@@ -19,8 +19,9 @@ function Player:init(x, y, gameManager)
 
     -- Sprite properties
     self:moveTo(x, y)
-    self:setZIndex(Z_INDEXES.PLAYER)
+    self:setZIndex(Z_INDEXES.Player)
     self:setCollideRect(3, 3, 10, 13)
+    self:setTag(TAGS.Player)
 
     -- Physics properties
     self.xVelocity = 0
@@ -53,7 +54,7 @@ end
 
 function Player:collisionResponse(other)
     local tag = other:getTag()
-    if tag == TAGS.Pickup then
+    if tag == TAGS.Pickup or tag == TAGS.Hazard then
         return gfx.sprite.kCollisionTypeOverlap
     end
     return gfx.sprite.kCollisionTypeSlide
@@ -192,13 +193,9 @@ function Player:die()
     self.dead = true
     self:setCollisionsEnabled(false)
     pd.timer.performAfterDelay(200, function()
-        self:setVisible(false)
-        pd.timer.performAfterDelay(400, function()
-            self:setVisible(true)
-            self:setCollisionsEnabled(true)
-            self.gameManager:resetPlayer()
-            self.dead = false
-        end)
+        self:setCollisionsEnabled(true)
+        self.gameManager:resetPlayer()
+        self.dead = false
     end)
 end
 

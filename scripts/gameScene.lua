@@ -5,12 +5,15 @@ local ldtk <const> = LDtk
 
 TAGS = {
 	Solid = 1,
-	Pickup = 2
+	Pickup = 2,
+	Player = 3,
+	Hazard = 4
 }
 
 Z_INDEXES = {
-	PLAYER = 100,
-	PICKUP = 50
+	Hazard = 20,
+	Pickup = 50,
+	Player = 100
 }
 
 -- local usePrecomputedLevels = not pd.isSimulator
