@@ -33,8 +33,8 @@ function Player:init(x, y, gameManager)
     self.minimumAirSpeed = 0.5
 
     -- Abilities
-    self.doubleJumpAbility = true
-    self.dashAbility = true
+    self.doubleJumpAbility = false
+    self.dashAbility = false
 
     -- Double Jump
     self.doubleJumpAvailable = true
@@ -162,7 +162,7 @@ function Player:handleMovementAndCollisions()
         if collisionTag == TAGS.Hazard then
             died = true
         elseif collisionTag == TAGS.Pickup then
-            collisionObject:pickUp()
+            collisionObject:pickUp(self)
         end
     end
 
