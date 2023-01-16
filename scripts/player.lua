@@ -7,6 +7,7 @@ class('Player').extends(AnimatedSprite)
 function Player:init(x, y, gameManager)
     self.gameManager = gameManager
 
+    -- State Machine
     local playerImageTable = gfx.imagetable.new("images/player-table-16-16")
     Player.super.init(self, playerImageTable)
 
@@ -14,46 +15,40 @@ function Player:init(x, y, gameManager)
     self:addState("run", 1, 3, {tickStep = 4})
     self:addState("jump", 4, 4)
     self:addState("dash", 4, 4)
+    self:playAnimation()
 
+    -- Sprite properties
+    self:moveTo(x, y)
+    self:setZIndex(Z_INDEXES.PLAYER)
+    self:setCollideRect(3, 3, 10, 13)
+
+    -- Physics properties
     self.xVelocity = 0
     self.yVelocity = 0
-    self.gravity = 0.8
-    self.fallingGravity = 1.0
+    self.gravity = 1.0
     self.maxSpeed = 2
-    self.startVelocity = 1.5
     self.jumpVelocity = -6
-    self.doubleJumpAvailable = true
-    self.doubleJumpDelayMax = 4
-    self.doubleJumpDelay = self.doubleJumpDelayMax
-
-    self.dead = false
-
-    self.friction = 0.5
     self.drag = 0.1
-    self.acceleration = 0.5
-
-    self.touchingGround = true
-    self.touchingCeiling = false
-    self.touchingWall = false
-
-    -- Dash
-    self.dashAvailable = true
-    self.dashSpeed = 7
-    self.dashMinimumSpeed = 5
-    self.dashDrag = 0.8
-    self.dashHeightBoost = -3
-    self.dashGravity = 0.5
+    self.minimumAirSpeed = 0.5
 
     -- Abilities
     self.doubleJumpAbility = true
     self.dashAbility = true
 
-    self:setCollideRect(3, 3, 10, 13)
+    -- Double Jump
+    self.doubleJumpAvailable = true
 
-    self:setZIndex(Z_INDEXES.PLAYER)
+    -- Dash
+    self.dashAvailable = true
+    self.dashSpeed = 8
+    self.dashMinimumSpeed = 3
+    self.dashDrag = 0.8
 
-    self:playAnimation()
-    self:moveTo(x, y)
+    -- Player State
+    self.touchingGround = false
+    self.touchingCeiling = false
+    self.touchingWall = false
+    self.dead = false
 end
 
 function Player:collisionResponse(other)
@@ -71,8 +66,15 @@ function Player:update()
 
     self:updateAnimation()
 
+    self:handleState()
+    self:handleMovementAndCollisions()
+end
+
+function Player:handleState()
     if self.currentState == "idle" then
-        if pd.buttonIsPressed(pd.kButtonA) then
+        self.xVelocity = 0
+        self:applyGravity()
+        if pd.buttonJustPressed(pd.kButtonA) then
             self:changeToJumpState()
         elseif pd.buttonJustPressed(pd.kButtonB) and self.dashAvailable and self.dashAbility then
             self:changeToDashState()
@@ -81,52 +83,87 @@ function Player:update()
         elseif pd.buttonIsPressed(pd.kButtonRight) then
             self:changeToRunState("right")
         end
-        self:applyFriction()
-        self:applyGravity()
     elseif self.currentState == "run" then
-        if pd.buttonIsPressed(pd.kButtonA)then
+        self:applyGravity()
+        if pd.buttonJustPressed(pd.kButtonA)then
             self:changeToJumpState()
         elseif pd.buttonJustPressed(pd.kButtonB) and self.dashAbility then
             self:changeToDashState()
         elseif pd.buttonIsPressed(pd.kButtonLeft) then
-            self:accelerateLeft()
+            self.xVelocity = -self.maxSpeed
         elseif pd.buttonIsPressed(pd.kButtonRight) then
-            self:accelerateRight()
+            self.xVelocity = self.maxSpeed
         else
-            self:changeState("idle")
+            self:changeToIdleState()
+        end
+    elseif self.currentState == "jump" then
+        if self.touchingGround then
+            if pd.buttonIsPressed(pd.kButtonLeft) then
+                self:changeToRunState("left")
+            elseif pd.buttonIsPressed(pd.kButtonRight) then
+                self:changeToRunState("right")
+            else
+                self:changeToIdleState()
+            end
+        elseif self.touchingCeiling then
+            self.yVelocity = 0
         end
         self:applyGravity()
-    elseif self.currentState == "jump" then
+
         if pd.buttonJustPressed(pd.kButtonB) and self.dashAvailable and self.dashAbility then
             self:changeToDashState()
+        elseif pd.buttonJustPressed(pd.kButtonA) and self.doubleJumpAvailable and self.doubleJumpAbility then
+            self.doubleJumpAvailable = false
+            self:changeToJumpState()
+        elseif pd.buttonIsPressed(pd.kButtonLeft) then
+            self.xVelocity = -self.maxSpeed
+        elseif pd.buttonIsPressed(pd.kButtonRight) then
+            self.xVelocity = self.maxSpeed
         else
-            self:handleJumpPhysics()
-            if self.yVelocity == 0 then
-                if pd.buttonIsPressed(pd.kButtonLeft) then
-                    self:changeToRunState("left")
-                elseif pd.buttonIsPressed(pd.kButtonRight) then
-                    self:changeToRunState("right")
-                else
-                    self:changeState("idle")
-                end
-            end
-            self:applyGravity()
+            self:applyDrag(self.drag)
         end
     elseif self.currentState == "dash" then
-        if self.xVelocity > 0 then
-            self.xVelocity -= self.dashDrag
-        elseif self.xVelocity < 0 then
-            self.xVelocity += self.dashDrag
-        end
-
-        self.yVelocity += self.dashGravity
-
+        self.yVelocity = 0
+        self:applyDrag(self.dashDrag)
         if math.abs(self.xVelocity) <= self.dashMinimumSpeed then
-            self:changeState("jump")
+            self:changeToFallState()
         end
     end
+end
 
-    self:handleMovementAndCollisions()
+function Player:handleMovementAndCollisions()
+    local _, _, collisions, length = self:moveWithCollisions(self.x + self.xVelocity, self.y + self.yVelocity)
+
+    self.touchingGround = false
+    self.touchingCeiling = false
+    self.touchingWall = false
+    local died = false
+
+    for i=1,length do
+        local collision = collisions[i]
+        local collisionType = collision.type
+        local collisionObject = collision.other
+        local collisionTag = collisionObject:getTag()
+        if collisionType == gfx.sprite.kCollisionTypeSlide then
+            if collision.normal.y == -1 then
+                self.touchingGround = true
+                self.doubleJumpAvailable = true
+                self.dashAvailable = true
+            elseif collision.normal.y == 1 then
+                self.touchingCeiling = true
+            end
+
+            if collision.normal.x ~= 0 then
+                self.touchingWall = true
+            end
+        end
+
+        if collisionTag == TAGS.Hazard then
+            died = true
+        elseif collisionTag == TAGS.Pickup then
+            collisionObject:pickUp()
+        end
+    end
 
     if self.xVelocity < 0 then
         self.globalFlip = 1
@@ -134,7 +171,7 @@ function Player:update()
         self.globalFlip = 0
     end
 
-	if self.x < 0 then
+    if self.x < 0 then
 		self.gameManager:enterRoom("west")
     elseif self.x > 400  then
         self.gameManager:enterRoom("east")
@@ -143,54 +180,6 @@ function Player:update()
     elseif self.y > 240 then
         self.gameManager:enterRoom("south")
 	end
-end
-
-function Player:handleMovementAndCollisions()
-    local _, _, collisions, length = self:moveWithCollisions(self.x + self.xVelocity, self.y + self.yVelocity)
-    self.touchingCeiling = false
-    self.touchingWall = false
-    self.interactingObject = nil
-
-    local touchedGround = false
-    local died = false
-    for i=1,length do
-        local collision = collisions[i]
-        local collisionType = collision.type
-        local collisionTag = collision.other:getTag()
-        if collisionType == gfx.sprite.kCollisionTypeOverlap then
-            if collisionTag == TAGS.Pickup then
-                collision.other:pickUp()
-            end
-        else
-            if collision.normal.y == -1 then
-                touchedGround = true
-            elseif collision.normal.y == 1 then
-                self.touchingCeiling = true
-            end
-            if collision.normal.x == -1 or collision.normal.x == 1 then
-                -- Wall Jump?
-            end
-        end
-
-        if collisionTag == TAGS.Hazard then
-            died = true
-        end
-    end
-
-    self.touchingGround = touchedGround
-    if self.touchingGround then
-        self.yVelocity = 0
-        self.doubleJumpAvailable = true
-        self.dashAvailable = true
-    end
-
-    if self.touchingCeiling then
-        self.yVelocity = 0
-    end
-
-    if self.touchingWall then
-        self.xVelocity = 0
-    end
 
     if died then
         self:die()
@@ -213,21 +202,38 @@ function Player:die()
     end)
 end
 
+-- State transitions
+function Player:changeToIdleState()
+    self:changeState("idle")
+end
+
+function Player:changeToRunState(direction)
+    if direction == "left" then
+        self.xVelocity = -self.maxSpeed
+        self.globalFlip = 1
+    elseif direction == "right" then
+        self.xVelocity = self.maxSpeed
+        self.globalFlip = 0
+    end
+    self:changeState("run")
+end
+
 function Player:changeToJumpState()
     self.yVelocity = self.jumpVelocity
-    self.doubleJumpDelay = self.doubleJumpDelayMax
+    self:changeState("jump")
+end
+
+function Player:changeToFallState()
     self:changeState("jump")
 end
 
 function Player:changeToDashState()
     self.dashAvailable = false
-    self.yVelocity = self.dashHeightBoost
+    self.yVelocity = 0
     if pd.buttonIsPressed(pd.kButtonLeft) then
         self.xVelocity = -self.dashSpeed
-        self.globalFlip = 1
     elseif pd.buttonIsPressed(pd.kButtonRight) then
         self.xVelocity = self.dashSpeed
-        self.globalFlip = 0
     else
         if self.globalFlip == 1 then
             self.xVelocity = -self.dashSpeed
@@ -238,82 +244,22 @@ function Player:changeToDashState()
     self:changeState("dash")
 end
 
-function Player:changeToRunState(direction)
-    if direction == "left" then
-        self.xVelocity = -self.startVelocity
-            self.globalFlip = 1
-    elseif direction == "right" then
-        self.xVelocity = self.startVelocity
-        self.globalFlip = 0
-    end
-    self:changeState("run")
-end
-
-function Player:handleJumpPhysics()
-    self.doubleJumpDelay -= 1
-    if self.doubleJumpDelay <= 0 then
-        self.doubleJumpDelay = 0
-    end
-    if pd.buttonJustPressed(pd.kButtonA) and self.doubleJumpAvailable and self.doubleJumpAbility and self.doubleJumpDelay <= 0 then
-        self.doubleJumpAvailable = false
-        self:changeToJumpState()
-    elseif pd.buttonIsPressed(pd.kButtonLeft) then
-        self:accelerateLeft()
-    elseif pd.buttonIsPressed(pd.kButtonRight) then
-        self:accelerateRight()
-    else
-        self:applyDrag()
-    end
-end
-
-function Player:accelerateLeft()
-    if self.xVelocity > 0 then
-        self.xVelocity = 0
-    end
-    self.xVelocity -= self.acceleration
-    if self.xVelocity <= -self.maxSpeed then
-        self.xVelocity = -self.maxSpeed
-    end
-end
-
-function Player:accelerateRight()
-    if self.xVelocity < 0 then
-        self.xVelocity = 0
-    end
-    self.xVelocity += self.acceleration
-    if self.xVelocity >= self.maxSpeed then
-        self.xVelocity = self.maxSpeed
-    end
-end
-
+-- Physics Helper Functions
 function Player:applyGravity()
-    if self.yVelocity < 0 then
-        self.yVelocity += self.gravity
-    else
-        self.yVelocity += self.fallingGravity
+    self.yVelocity += self.gravity
+    if self.touchingGround then
+        self.yVelocity = 0
     end
 end
 
-function Player:applyDrag()
+function Player:applyDrag(amount)
     if self.xVelocity > 0 then
-        self.xVelocity -= self.drag
+        self.xVelocity -= amount
     elseif self.xVelocity < 0 then
-        self.xVelocity += self.drag
+        self.xVelocity += amount
     end
 
-    if math.abs(self.xVelocity) < 0.5 then
-        self.xVelocity = 0
-    end
-end
-
-function Player:applyFriction()
-    if self.xVelocity > 0 then
-        self.xVelocity -= self.friction
-    elseif self.xVelocity < 0 then
-        self.xVelocity += self.friction
-    end
-
-    if math.abs(self.xVelocity) < 0.5 then
+    if math.abs(self.xVelocity) < self.minimumAirSpeed or self.touchingWall then
         self.xVelocity = 0
     end
 end
