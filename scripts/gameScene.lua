@@ -31,7 +31,7 @@ function GameScene:init()
     self.spawnX = 3 * 16
     self.spawnY = 11 * 16
 
-    self.player = Player(self.spawnX, self.spawnY, self, abilities)
+    self.player = Player(self.spawnX, self.spawnY, self)
 end
 
 function GameScene:resetPlayer()
