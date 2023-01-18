@@ -1,4 +1,3 @@
-local pd <const> = playdate
 local gfx <const> = playdate.graphics
 
 local spikeballImage <const> = gfx.image.new("images/spikeball")
@@ -14,11 +13,17 @@ function Spikeball:init(x, y, entity)
 
     self:setTag(TAGS.Hazard)
     self:setCollideRect(4, 4, 8, 8)
-    self.collisionResponse = gfx.sprite.kCollisionTypeBounce
 
     local fields = entity.fields
     self.xVelocity = fields.xVelocity
     self.yVelocity = fields.yVelocity
+end
+
+function Spikeball:collisionResponse(other)
+    if other:getTag() == TAGS.Player then
+        return gfx.sprite.kCollisionTypeOverlap
+    end
+    return gfx.sprite.kCollisionTypeBounce
 end
 
 function Spikeball:update()
