@@ -16,9 +16,9 @@ Z_INDEXES = {
 	Player = 100
 }
 
--- local usePrecomputedLevels = not pd.isSimulator
+local usePrecomputedLevels = not pd.isSimulator
 
-ldtk.load("levels/world.ldtk", false)
+ldtk.load("levels/world.ldtk", usePrecomputedLevels)
 
 if pd.isSimulator then
 	ldtk.export_to_lua_files()
@@ -39,7 +39,7 @@ function GameScene:resetPlayer()
 end
 
 function GameScene:enterRoom(direction)
-	local level = ldtk.get_neighbours(self.level_name, direction)[1]
+	local level = ldtk.get_neighbours(self.levelName, direction)[1]
 	self:goToLevel(level)
 	self.player:add()
 	local spawnX, spawnY
@@ -57,16 +57,16 @@ function GameScene:enterRoom(direction)
 	self.spawnY = spawnY
 end
 
-function GameScene:goToLevel(level_name)
-    if not level_name then return end
+function GameScene:goToLevel(levelName)
+    if not levelName then return end
 
-	self.level_name = level_name
+	self.levelName = levelName
 
 	gfx.sprite.removeAll()
 
-	for layer_name, layer in pairs(ldtk.get_layers(level_name)) do
+	for layer_name, layer in pairs(ldtk.get_layers(levelName)) do
 		if layer.tiles then
-			local tilemap = ldtk.create_tilemap(level_name, layer_name)
+			local tilemap = ldtk.create_tilemap(levelName, layer_name)
 
 			local layerSprite = gfx.sprite.new()
 			layerSprite:setTilemap(tilemap)
@@ -75,7 +75,7 @@ function GameScene:goToLevel(level_name)
 			layerSprite:setZIndex(layer.zIndex)
 			layerSprite:add()
 
-            local emptyTiles = ldtk.get_empty_tileIDs(level_name, "Solid", layer_name)
+            local emptyTiles = ldtk.get_empty_tileIDs(levelName, "Solid", layer_name)
             if emptyTiles then
                 local tileSprites = gfx.sprite.addWallSprites(tilemap, emptyTiles)
                 for i=1,#tileSprites do
@@ -86,7 +86,7 @@ function GameScene:goToLevel(level_name)
 		end
 	end
 
-	for _, entity in ipairs(ldtk.get_entities(level_name)) do
+	for _, entity in ipairs(ldtk.get_entities(levelName)) do
 		local entityX, entityY = entity.position.x, entity.position.y
 		local entityName = entity.name
 		if entityName == "Ability" then
