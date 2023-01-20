@@ -64,9 +64,9 @@ function GameScene:goToLevel(levelName)
 
 	gfx.sprite.removeAll()
 
-	for layer_name, layer in pairs(ldtk.get_layers(levelName)) do
+	for layerName, layer in pairs(ldtk.get_layers(levelName)) do
 		if layer.tiles then
-			local tilemap = ldtk.create_tilemap(levelName, layer_name)
+			local tilemap = ldtk.create_tilemap(levelName, layerName)
 
 			local layerSprite = gfx.sprite.new()
 			layerSprite:setTilemap(tilemap)
@@ -75,7 +75,7 @@ function GameScene:goToLevel(levelName)
 			layerSprite:setZIndex(layer.zIndex)
 			layerSprite:add()
 
-            local emptyTiles = ldtk.get_empty_tileIDs(levelName, "Solid", layer_name)
+            local emptyTiles = ldtk.get_empty_tileIDs(levelName, "Solid", layerName)
             if emptyTiles then
                 local tileSprites = gfx.sprite.addWallSprites(tilemap, emptyTiles)
                 for i=1,#tileSprites do
