@@ -4,10 +4,9 @@ local gfx <const> = playdate.graphics
 local ldtk <const> = LDtk
 
 TAGS = {
-	Solid = 1,
-	Pickup = 2,
-	Player = 3,
-	Hazard = 4
+	Pickup = 1,
+	Player = 2,
+	Hazard = 3
 }
 
 Z_INDEXES = {
@@ -77,11 +76,7 @@ function GameScene:goToLevel(levelName)
 
             local emptyTiles = ldtk.get_empty_tileIDs(levelName, "Solid", layerName)
             if emptyTiles then
-                local tileSprites = gfx.sprite.addWallSprites(tilemap, emptyTiles)
-                for i=1,#tileSprites do
-                    local tileSprite = tileSprites[i]
-                    tileSprite:setTag(TAGS.Solid)
-                end
+                gfx.sprite.addWallSprites(tilemap, emptyTiles)
             end
 		end
 	end
